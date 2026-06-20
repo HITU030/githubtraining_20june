@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		    <meta charset="UTF-8">
+		        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+			    <title>Retro Arcade Brick Breaker</title>
+			        <style>
+        * {
+		            margin: 0;
+			                padding: 0;
+					            box-sizing: border-box;
+						            }
+
+	        body {
+			            background: #0f0c20;
+				                font-family: 'Courier New', Courier, monospace;
+						            display: flex;
+							                flex-direction: column;
+									            align-items: center;
+										                justify-content: center;
+												            min-height: 100vh;
+													                color: #fff;
+															            overflow: hidden;
+																            }
+
+		        h1 {
+				            font-size: 2.5rem;
+					                margin-bottom: 10px;
+							            color: #00ffcc;
+								                text-shadow: 0 0 10px #00ffcc;
+										            letter-spacing: 2px;
+											            }
+
+			        #game-container {
+					            position: relative;
+						                box-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
+								            border: 4px solid #333;
+									                border-radius: 8px;
+											            background-color: #000;
+												            }
+
+				        canvas {
+						            display: block;
+							                background: #111;
+									        }
+
+					        .screen {
+							            position: absolute;
+								                top: 0;
+										            left: 0;
+											                width: 100%;
+													            height: 100%;
+														                display: flex;
+																            flex-direction: column;
+																	                align-items: center;
+																			            justify-content: center;
+																				                background: rgba(15, 12, 32, 0.85);
+																						            z-index: 10;
+																							                transition: all 0.3s ease;
+																									        }
+
+						        .hide {
+								            display: none !important;
+									            }
+
+							        button {
+									            padding: 12px 28px;
+										                font-size: 1.2rem;
+												            font-family: inherit;
+													                background: #ff0055;
+															            color: white;
+																                border: none;
+																		            border-radius: 4px;
+																			                cursor: pointer;
+																					            box-shadow: 0 0 15px #ff0055;
+																						                transition: transform 0.1s, box-shadow 0.1s;
+																								            font-weight: bold;
+																									                margin-top: 20px;
+																											            text-transform: uppercase;
+																												            }
+
+								        button:hover {
+										            transform: scale(1.05);
+											                box-shadow: 0 0 25px #ff0055;
+													        }
+
+									        button:active {
+											            transform: scale(0.95);
+												            }
+
+										        p {
+												            font-size: 1rem;
+													                color: #bbb;
+															            margin: 5px 0;
+																                text-align: center;
+																		        }
+
+											        .controls-hint {
+													            margin-top: 15px;
+														                font-size: 0.9rem;
+																            color: #666;
+																	            }
+												    </style>
+	</head>
+	<body>
+
+		    <h1>BRICK BREAKER</h1>
+
+		        <div id="game-container">
+				        <div id="start-screen" class="screen">
+						            <h2 style="color: #ff0055; font-size: 2rem; margin-bottom: 10px; text-shadow: 0 0 10px #ff0055;">ARCADE MODE</h2>
+							                <p>Destroy all neon bricks to win!</p>
+									            <p class="controls-hint">Use ◄ ► Arrow Keys or Move Mouse / Touch to steer paddle</p>
+										                <button id="start-btn">Start Game</button>
+												        </div>
+
+													        <div id="game-over-screen" class="screen hide">
+															            <h2 style="color: #ff3333; font-size: 3rem; margin-bottom: 10px;">GAME OVER</h2>
+																                <p id="final-score">Score: 0</p>
+																		            <button id="restart-btn">Try Again</button>
+																			            </div>
+
+																				            <div id="win-screen" class="screen hide">
+																						                <h2 style="color: #00ffcc; font-size: 3rem; margin-bottom: 10px;">VICTORY!</h2>
+																								            <p id="win-score">Final Score: 0</p>
+																									                <button id="win-btn">Play Again</button>
+																											        </div>
+
+																												        <canvas id="gameCanvas" width="800" height="500"></canvas>
+																													    </div>
+
+																													        <script>
+																															        const canvas = document.getElementById("gameCanvas");
+																																        const ctx = canvas.getContext("2d");
+
+																																        // Screens & Buttons
+																																        const startScreen = document.getElementById("start-screen");
+																																        const gameOverScreen = document.getElementById("game-over-screen");
+																																        const winScreen = document.getElementById("win-screen");
+																																        const startBtn = document.getElementById("start-btn");
+																																        const restartBtn = document.getElementById("restart-btn");
+																																        const winBtn = document.getElementById("win-btn");
+																																        const finalScoreTxt = document.getElementById("final-score");
+																																        const winScoreTxt = document.getElementById("win-score");
+
+																																        // Game Variables
+																																        let score = 0;
+																																        let lives = 3;
+																																        let gameRunning = false;
+
+																																        // Paddle Properties
+																																        const paddleHeight = 15;
+																																        const paddleWidth = 100;
+																																        let paddleX = (canvas.width - paddleWidth) / 2;
+																																        let rightPressed = false;
+																																        let leftPressed = false;
+
+																																        // Ball Properties
+																																        const ballRadius = 8;
+																																        let x = canvas.width / 2;
+																																        let y = canvas.height - 30;
+																																        let dx = 4;
+																																        let dy = -4;
+																																        const baseSpeed = 5.5;
+
+																																        // Brick Properties
+																																        const brickRowCount = 5;
+																																        const brickColumnCount = 9;
+																																        const brickWidth = 75;
+																																        const brickHeight = 24;
+																																        const brickPadding = 10;
+																																        const brickOffsetTop = 50;
+																																        const brickOffsetLeft = 35;
+
+																																        // Color palette for bricks (Arcade Neon look)
+																																        const colors = ["#ff0055", "#ff9900", "#ffea00", "#00ffcc", "#0099ff"];
+
+																																        let bricks = [];
+																																        function initBricks() {
+																																		            bricks = [];
+																																		            for (let c = 0; c < brickColumnCount; c++) {
+																																				                    bricks[c] = [];
+																																				                    for (let r = 0; r < brickRowCount; r++) {
+																																							                        bricks[c][r] = { x: 0, y: 0, status: 1, color: colors[r] };
+																																							                    }
+																																				                }
+																																		        }
+
+																																        // Event Listeners
+																																        document.addEventListener("keydown", keyDownHandler, false);
+																																        document.addEventListener("keyup", keyUpHandler, false);
+																																        document.addEventListener("mousemove", mouseMoveHandler, false);
+																																        canvas.addEventListener("touchmove", touchMoveHandler, { passive: true });
+
+																																        startBtn.addEventListener("click", startGame);
+																																        restartBtn.addEventListener("click", startGame);
+																																        winBtn.addEventListener("click", startGame);
+
+																																        function keyDownHandler(e) {
+																																		            if (e.key === "Right" || e.key === "ArrowRight") rightPressed = true;
+																																		            else if (e.key === "Left" || e.key === "ArrowLeft") leftPressed = true;
+																																		        }
+
+																																        function keyUpHandler(e) {
+																																		            if (e.key === "Right" || e.key === "ArrowRight") rightPressed = false;
+																																		            else if (e.key === "Left" || e.key === "ArrowLeft") leftPressed = false;
+																																		        }
+
+																																        function mouseMoveHandler(e) {
+																																		            const relativeX = e.clientX - canvas.getBoundingClientRect().left;
+																																		            if (relativeX > 0 && relativeX < canvas.width) {
+																																				                    paddleX = relativeX - paddleWidth / 2;
+																																				                }
+																																		        }
+
+																																        function touchMoveHandler(e) {
+																																		            const relativeX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+																																		            if (relativeX > 0 && relativeX < canvas.width) {
+																																				                    paddleX = relativeX - paddleWidth / 2;
+																																				                }
+																																		        }
+
+																																        // Collision Detection
+																																        function collisionDetection() {
+																																		            let activeBricks = 0;
+																																		            for (let c = 0; c < brickColumnCount; c++) {
+																																				                    for (let r = 0; r < brickRowCount; r++) {
+																																							                        let b = bricks[c][r];
+																																							                        if (b.status === 1) {
+																																											                        activeBricks++;
+																																											                        if (x > b.x && x < b.x + brickWidth && y > b.y && y < b.y + brickHeight) {
+																																															                            dy = -dy;
+																																															                            b.status = 0;
+																																															                            score += 10;
+																																															                            
+																																															                            // Slight speed increase on hit for arcade feel
+																																															                            dx *= 1.01;
+																																															                            dy *= 1.01;
+																																															                        }
+																																											                    }
+																																							                    }
+																																				                }
+																																		            // Win Condition
+																																		            if (activeBricks === 0 && gameRunning) {
+																																				                    gameRunning = false;
+																																				                    winScoreTxt.innerText = "Final Score: " + score;
+																																				                    winScreen.classList.remove("hide");
+																																				                }
+																																		        }
+
+																																        // Draw Functions
+																																        function drawBall() {
+																																		            ctx.beginPath();
+																																		            ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+																																		            ctx.fillStyle = "#fff";
+																																		            ctx.shadowBlur = 10;
+																																		            ctx.shadowColor = "#fff";
+																																		            ctx.fill();
+																																		            ctx.closePath();
+																																		            ctx.shadowBlur = 0; // reset shadow
+																																		        }
+
+																																        function drawPaddle() {
+																																		            ctx.beginPath();
+																																		            ctx.rect(paddleX, canvas.height - paddleHeight - 10, paddleWidth, paddleHeight);
+																																		            ctx.fillStyle = "#00ffcc";
+																																		            ctx.shadowBlur = 15;
+																																		            ctx.shadowColor = "#00ffcc";
+																																		            ctx.fill();
+																																		            ctx.closePath();
+																																		            ctx.shadowBlur = 0;
+																																		        }
+
+																																        function drawBricks() {
+																																		            for (let c = 0; c < brickColumnCount; c++) {
+																																				                    for (let r = 0; r < brickRowCount; r++) {
+																																							                        if (bricks[c][r].status === 1) {
+																																											                        let brickX = (c * (brickWidth + brickPadding)) + brickOffsetLeft;
+																																											                        let brickY = (r * (brickHeight + brickPadding)) + brickOffsetTop;
+																																											                        bricks[c][r].x = brickX;
+																																											                        bricks[c][r].y = brickY;
+																																											                        
+																																											                        ctx.beginPath();
+																																											                        ctx.rect(brickX, brickY, brickWidth, brickHeight);
+																																											                        ctx.fillStyle = bricks[c][r].color;
+																																											                        ctx.shadowBlur = 4;
+																																											                        ctx.shadowColor = bricks[c][r].color;
+																																											                        ctx.fill();
+																																											                        ctx.closePath();
+																																											                        ctx.shadowBlur = 0;
+																																											                    }
+																																							                    }
+																																				                }
+																																		        }
+
+																																        function drawHUD() {
+																																		            // Score
+																																		            ctx.font = "16px 'Courier New'";
+																																		            ctx.fillStyle = "#00ffcc";
+																																		            ctx.fillText("SCORE: " + score, 20, 25);
+
+																																		            // Lives represented by Arcade Hearts/Symbols
+																																		            ctx.fillStyle = "#ff0055";
+																																		            ctx.fillText("LIVES: " + "♥ ".repeat(lives), canvas.width - 140, 25);
+																																		        }
+
+																																        // Main Game Loop
+																																        function draw() {
+																																		            if (!gameRunning) return;
+
+																																		            ctx.clearRect(0, 0, canvas.width, canvas.height);
+																																		            drawBricks();
+																																		            drawBall();
+																																		            drawPaddle();
+																																		            drawHUD();
+																																		            collisionDetection();
+
+																																		            // Wall Collisions (Left / Right)
+																																		            if (x + dx > canvas.width - ballRadius || x + dx < ballRadius) {
+																																				                    dx = -dx;
+																																				                }
+																																		            // Ceiling Collision
+																																		            if (y + dy < ballRadius) {
+																																				                    dy = -dy;
+																																				                } 
+																																		            // Bottom Floor / Paddle Collision
+																																		            else if (y + dy > canvas.height - ballRadius - 10 - paddleHeight) {
+																																				                    if (x > paddleX && x < paddleX + paddleWidth) {
+																																							                        // Calculate relative bounce angle based on where the ball hits the paddle
+																																							                        let hitPoint = (x - (paddleX + paddleWidth / 2)) / (paddleWidth / 2);
+																																							                        dx = hitPoint * baseSpeed;
+																																							                        dy = -Math.sqrt(baseSpeed * baseSpeed - dx * dx); // Keep speed consistent
+																																							                    } else if (y + dy > canvas.height - ballRadius) {
+																																										                        // Ball fell past paddle
+																																										                        lives--;
+																																										                        if (!lives) {
+																																														                        gameRunning = false;
+																																														                        finalScoreTxt.innerText = "Score: " + score;
+																																														                        gameOverScreen.classL
+																																														            // Move Paddle
+																																														            if (rightPressed && paddleX < canvas.width - paddleWidth) {
+																																																                    paddleX += 7;
+																																																                } else if (leftPressed && paddleX > 0) {
+																																																			                paddleX -= 7;
+																																																			            }
+
+																																														            // Move Ball
+																																														            x += dx;
+																																														            y += dy;
+
+																																														            requestAnimationFram
+																																														            // Reset States
+																																														            score = 0;
+																																														            lives = 3;
+																																														            x = canvas.width / 2;
+																																														            y = canvas.height - 30;
+																																														            dx = baseSpeed;
+																																														            dy = -baseSpeed;
+																																														            paddl            gameRunning = true;
+																																														            draw();
+																																														        }
+																																										        </script>
+	</body>
+</html>
